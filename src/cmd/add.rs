@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use clap::Args;
 use regex::Regex;
 
-use crate::cmd::{snake_to_pascal_case, write_command};
+use super::{snake_to_pascal_case, write_command};
 
 #[derive(Args)]
 pub struct Add {
@@ -16,7 +16,6 @@ impl Add {
         let mut content = fs::read_to_string("src/cmd/mod.rs")?;
         let name = snake_to_pascal_case(&self.command);
 
-        // Add import
         let import_regex = Regex::new(r"(?m)^use.*?;\n$")?;
         let last_import = import_regex
             .find_iter(&content)
@@ -24,10 +23,9 @@ impl Add {
             .ok_or(anyhow!("No imports found"))?;
         content.insert_str(
             last_import.end(),
-            &format!("mod {};\nuse {}::{};\n", self.command, self.command, name),
+            &format!("\nmod {};\nuse {}::{};\n", self.command, self.command, name),
         );
 
-        // Add enum variant
         let enum_regex = Regex::new(r"pub enum Command \{(?s).*?\n\}")?;
         let enum_match = enum_regex
             .find(&content)
@@ -35,7 +33,6 @@ impl Add {
         let new_variant = format!("    {}({}),\n", name, name);
         content.insert_str(enum_match.end() - 1, &new_variant);
 
-        // Add match arm
         let match_regex = Regex::new(r"match self \{(?s).*?\n        \}")?;
         let match_match = match_regex
             .find(&content)
