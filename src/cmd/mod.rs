@@ -8,11 +8,11 @@ use clap::Subcommand;
 #[macro_export]
 macro_rules! cmd {
     ($prog:expr) => {{
-        $crate::finish!(std::process::Command::new($prog))
+        $crate::cmd::finish(&mut std::process::Command::new($prog))
     }};
 
     ($prog:expr, $args:expr) => {{
-        $crate::finish!(std::process::Command::new($prog).args($args))
+        $crate::cmd::finish(std::process::Command::new($prog).args($args))
     }};
 
     ($prog:expr, $($arg:expr),*) => {{
@@ -20,15 +20,12 @@ macro_rules! cmd {
     }};
 }
 
-#[macro_export]
-macro_rules! finish {
-    ($cmd:expr) => {
-        match $cmd.status() {
-            Ok(status) if status.success() => Ok(()),
-            Ok(_) => Err(anyhow::anyhow!("command failed with non-zero exit code")),
-            Err(e) => Err(anyhow::anyhow!("failed to run command: {}", e)),
-        }
-    };
+pub(crate) fn finish(cmd: &mut std::process::Command) -> anyhow::Result<()> {
+    match cmd.status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(_) => anyhow::bail!("command failed with non-zero exit code"),
+        Err(e) => anyhow::bail!("failed to run command: {e}"),
+    }
 }
 
 #[derive(Subcommand)]
