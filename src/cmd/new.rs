@@ -3,6 +3,7 @@ use std::{env, fs};
 use anyhow::Result;
 use clap::{ArgAction, Args};
 
+use super::{snake_to_pascal_case, write_command};
 use crate::cmd;
 
 #[derive(Args)]
@@ -24,19 +25,6 @@ impl New {
 
         Ok(())
     }
-}
-
-fn snake_to_pascal_case(snake: &str) -> String {
-    snake
-        .split('_')
-        .map(|word| {
-            let mut c = word.chars();
-            match c.next() {
-                None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-            }
-        })
-        .collect::<String>()
 }
 
 const MAIN_RS: &'static str = r#"mod cmd;
@@ -62,28 +50,6 @@ fn write_main() -> Result<()> {
     Ok(())
 }
 
-fn write_command(cmd: &str, name: &str) -> Result<()> {
-    let content = format!(
-        r#"use clap::Args;
-
-#[derive(Args)]
-pub struct {name} {{
-    // Add command-specific arguments here
-}}
-
-impl {name} {{
-    pub fn execute(&self) -> crate::Result<()> {{
-        // Implement command logic here
-        println!("{cmd} command executed");
-        Ok(())
-    }}
-}}
-"#
-    );
-    fs::write(format!("src/cmd/{cmd}.rs"), content)?;
-    Ok(())
-}
-
 fn write_commands(cmds: &[String]) -> Result<()> {
     fs::create_dir_all("src/cmd")?;
     let mut imports = String::new();
@@ -103,9 +69,9 @@ fn write_commands(cmds: &[String]) -> Result<()> {
     let arms = arms.trim_end();
 
     let cmd_mod_rs = format!(
-        r#"{imports}
+        r#"use clap::Subcommand;
 
-use clap::Subcommand;
+{imports}
 
 #[derive(Subcommand)]
 pub enum Command {{
