@@ -1,20 +1,33 @@
-use std::{
-    env, fs,
-    process::{self},
-};
+use std::{env, fs};
 
-use clap::Args;
+use anyhow::Result;
+use clap::{ArgAction, Args};
 
-use crate::run;
+use crate::cmd;
 
 #[derive(Args)]
 pub struct New {
-    // Add command-specific arguments here
     name: String,
+
+    #[arg(action = ArgAction::Append)]
+    commands: Vec<String>,
 }
 
-fn snake_to_pascal_case(snake_str: &str) -> String {
-    snake_str
+impl New {
+    pub fn execute(&self) -> Result<()> {
+        cmd!("cargo", "new", &self.name)?;
+        env::set_current_dir(&self.name)?;
+        cmd!("cargo", "add", "clap", "--features", "derive")?;
+
+        write_main()?;
+        write_commands(&self.commands)?;
+
+        Ok(())
+    }
+}
+
+fn snake_to_pascal_case(snake: &str) -> String {
+    snake
         .split('_')
         .map(|word| {
             let mut c = word.chars();
@@ -26,8 +39,7 @@ fn snake_to_pascal_case(snake_str: &str) -> String {
         .collect::<String>()
 }
 
-fn write_main() -> fu::Result<()> {
-    let main_rs = "mod cmd;
+const MAIN_RS: &'static str = r#"mod cmd;
 use clap::Parser;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -42,13 +54,15 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     cli.command.execute()
-}";
+}
+"#;
 
-    fs::write("test_main.rs", main_rs)?;
+fn write_main() -> Result<()> {
+    fs::write("src/main.rs", MAIN_RS)?;
     Ok(())
 }
 
-fn write_command(cmd: &str, name: &str) -> fu::Result<()> {
+fn write_command(cmd: &str, name: &str) -> Result<()> {
     let content = format!(
         r#"use clap::Args;
 
@@ -60,33 +74,37 @@ pub struct {name} {{
 impl {name} {{
     pub fn execute(&self) -> crate::Result<()> {{
         // Implement command logic here
-        println!("{name} command executed");
+        println!("{cmd} command executed");
         Ok(())
     }}
-}}"#
+}}
+"#
     );
     fs::write(format!("src/cmd/{cmd}.rs"), content)?;
     Ok(())
 }
 
-fn write_commands(cmds: &[&str]) -> fu::Result<()> {
+fn write_commands(cmds: &[String]) -> Result<()> {
+    fs::create_dir_all("src/cmd")?;
     let mut imports = String::new();
     let mut variants = String::new();
     let mut arms = String::new();
 
     for cmd in cmds {
         let name = snake_to_pascal_case(cmd);
-        imports.push_str(&format!("mod {cmd};\nuse {cmd}::{name};\n"));
+        imports.push_str(&format!("mod {cmd};\nuse {cmd}::{name};\n\n"));
         variants.push_str(&format!("{name}({name}),\n    "));
         arms.push_str(&format!("{name}(cmd) => cmd.execute(),\n            "));
         write_command(cmd, &name)?;
     }
 
+    let imports = imports.trim_end();
     let variants = variants.trim_end();
     let arms = arms.trim_end();
 
     let cmd_mod_rs = format!(
         r#"{imports}
+
 use clap::Subcommand;
 
 #[derive(Subcommand)]
@@ -101,35 +119,10 @@ impl Command {{
             {arms}
         }}
     }}
-}}"#
+}}
+"#
     );
 
-    fs::create_dir_all("src/cmd")?;
     fs::write("src/cmd/mod.rs", cmd_mod_rs)?;
     Ok(())
-}
-
-impl New {
-    pub fn execute(&self) -> fu::Result<()> {
-        fs::create_dir_all("test")?;
-        env::set_current_dir("test")?;
-        /* let mut cmd = process::Command::new("cargo");
-
-                if !run!(cmd, "new", &self.name)? {
-                    process::exit(1);
-                }
-
-                cmd.current_dir(&self.name);
-                if !run!(cmd, "add", "clap", "--features", "derive")? {
-                    process::exit(1);
-                }
-        */
-
-        let cmds = ["one", "two"];
-
-        write_main()?;
-        write_commands(&cmds)?;
-
-        Ok(())
-    }
 }

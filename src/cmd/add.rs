@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Args;
 
 #[derive(Args)]
@@ -6,7 +7,7 @@ pub struct Add {
 }
 
 impl Add {
-    pub fn execute(&self) -> fu::Result<()> {
+    pub fn execute(&self) -> Result<()> {
         // Implement command logic here
         println!("Add command executed");
         Ok(())

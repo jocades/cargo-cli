@@ -6,16 +6,29 @@ use new::New;
 use clap::Subcommand;
 
 #[macro_export]
-macro_rules! run {
-    ($cmd:expr, $args:expr) => {{
-        $cmd.args($args)
-            .status()
-            .and_then(|status| Ok(status.success()))
+macro_rules! cmd {
+    ($prog:expr) => {{
+        $crate::finish!(std::process::Command::new($prog))
     }};
 
-    ($cmd:expr, $($arg:expr),*) => {{
-        $crate::run!($cmd, &[$($arg),*])
+    ($prog:expr, $args:expr) => {{
+        $crate::finish!(std::process::Command::new($prog).args($args))
     }};
+
+    ($prog:expr, $($arg:expr),*) => {{
+        $crate::cmd!($prog, &[$($arg),*])
+    }};
+}
+
+#[macro_export]
+macro_rules! finish {
+    ($cmd:expr) => {
+        match $cmd.status() {
+            Ok(status) if status.success() => Ok(()),
+            Ok(_) => Err(anyhow::anyhow!("command failed with non-zero exit code")),
+            Err(e) => Err(anyhow::anyhow!("failed to run command: {}", e)),
+        }
+    };
 }
 
 #[derive(Subcommand)]
@@ -25,7 +38,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn execute(&self) -> fu::Result<()> {
+    pub fn execute(&self) -> anyhow::Result<()> {
         use Command::*;
         match self {
             New(cmd) => cmd.execute(),

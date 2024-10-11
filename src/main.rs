@@ -1,4 +1,5 @@
 mod cmd;
+use anyhow::Result;
 use clap::Parser;
 
 #[derive(Parser)]
@@ -8,7 +9,7 @@ struct Cli {
     command: cmd::Command,
 }
 
-fn main() -> fu::Result<()> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
     cli.command.execute()
 }
